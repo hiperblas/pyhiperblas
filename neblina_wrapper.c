@@ -1,4 +1,5 @@
 #include "Python.h"
+#include <numpy/arrayobject.h>
 #include "neblina.h"
 #include "neblina_std.h"
 #include "neblina_vector.h"
@@ -97,11 +98,80 @@ static PyObject* py_vector_new(PyObject* self, PyObject* args){
     int data_type;
     if (!PyArg_ParseTuple(args, "ii", &len,&data_type)) return NULL;
     //printf("create %d\n",len);
-    vector_t * a = bridge_manager.bridges[bridge_index].vector_new(len, data_type, 1);
+    vector_t * a = bridge_manager.bridges[bridge_index].vector_new(len, data_type, 1, NULL);
     //printf("malloc %p\n",a);
     PyObject* po = PyCapsule_New((void*)a, "py_vector_new", py_vector_delete);
     //printf("capsule_new %p\n",po);
     return po;
+}
+
+static PyObject* py_load_numpy_array(PyObject* self, PyObject* args){
+    PyObject* a = NULL;
+
+    int i = 1;
+    if(!PyArg_ParseTuple(args, "O:py_load_numpy_array", &a)) return NULL;
+
+    float* dataArrayA = (float*)PyArray_DATA((PyArrayObject*)a);
+    // printf("%p\n",dataArrayA);
+    // printf("%d\n",i++);
+
+    npy_intp* shape = PyArray_DIMS((PyArrayObject*)a);
+    // printf("%d\n",i++);
+
+    int rows = shape[0];
+    int cols = shape[1];
+    printf("rows=%d cols=%d sizeof(double)=%ld\n",rows, cols, sizeof(double));
+    int len = shape[0];
+    PyArray_Descr* dtype = PyArray_DESCR(a);
+    char typekind = dtype->kind;  // 'i' for signed integer, 'f' for float, etc.
+    int itemsize = dtype->elsize; // Size of each element in bytes
+    //printf("Data Type: %c, Item Size: %d\n", typekind, itemsize);
+
+    int data_type = (dtype->kind == 'f' ? T_FLOAT : T_COMPLEX);
+    printf("%d\n",i++);
+
+    vector_t * vec_a = bridge_manager.bridges[bridge_index].vector_new(len, data_type, 0, dataArrayA);
+    printf("%d\n",i++);
+
+    // printf("%p\n",vec_a->value.f);
+
+    PyObject* po = PyCapsule_New((void*)vec_a, "py_vector_new", py_vector_delete);
+
+    return po;
+}
+
+static PyObject* py_retrieve_numpy_array(PyObject* self, PyObject* args){
+    
+    PyObject* pf = NULL;
+
+    if(!PyArg_ParseTuple(args, "O:py_retrieve_numpy_array", &pf)) return NULL;
+
+    // printf("pf %p\n",pf);
+    vector_t * vec = (vector_t *)PyCapsule_GetPointer(pf, "py_vector_new");
+    // printf("vec %p\n",vec);
+    // printf("%p\n",vec->value.f);
+    bridge_manager.bridges[bridge_index].vecreqhost(vec);
+    vec->externalData = 1; //to make sure it will not be deallocated
+
+    // for (int i=0; i < vec->len; i++){
+    //     printf("%d %lf\n", i, vec->value.f[i]);
+    // }
+    int rows = vec->len;
+    npy_intp dims[1] = {rows};  // Array dimensions
+    int data_type = (vec->type == T_FLOAT ? NPY_FLOAT64 : NPY_COMPLEX128);
+
+    PyObject* numpyArray = PyArray_SimpleNewFromData(1, dims, data_type, vec->value.f);
+
+    // double* outputData = (double*)PyArray_DATA((PyArrayObject*)numpyArray);
+
+    // for (int i=0; i < dims[0]; i++) {
+    //     printf("%d %f\n",i,outputData[i]);
+    // }
+
+    // Make sure to set flags to the NumPy array to manage memory correctly
+    PyArray_ENABLEFLAGS((PyArrayObject*)numpyArray, NPY_ARRAY_OWNDATA);
+    
+    return numpyArray;
 }
 
 static PyObject* py_vector_set(PyObject* self, PyObject* args) {
@@ -193,6 +263,19 @@ static PyObject* py_vec_add(PyObject* self, PyObject* args) {
     //printf("vec add to call\n");
     vector_t * r = (vector_t *) vec_add(&bridge_manager, bridge_index, (void **) in, NULL );
     
+    //TODO this part returns a numpy_array (not working yet)
+    // PyObject* outputArray = PyArray_SimpleNew(2, shape, data_type);
+    // printf("%d\n",i++);
+
+    // float* outputData = (float*)PyArray_DATA((PyArrayObject*)outputArray);
+    // printf("%d\n",i++);
+
+    // printf("%p %p\n",outputData,r->value.f);
+    // for (int i=0; i < r->len; i++) {
+    //     printf("%d %f\n",i,r->value.f[i]);
+    // }
+    // memcpy(outputData, r->value.f, r->len);
+    // printf("%d\n",i++);
 
     PyObject* po = PyCapsule_New((void*)r, "py_vector_new", py_vector_delete);
     return po;
@@ -326,6 +409,75 @@ static void py_matrix_delete(PyObject* self) {
     bridge_manager.bridges[bridge_index].matrix_delete(mat);
 }
 
+static PyObject* py_load_numpy_matrix(PyObject* self, PyObject* args){
+    PyObject* a = NULL;
+
+    int i = 1;
+    if(!PyArg_ParseTuple(args, "O:py_load_numpy_matrix", &a)) return NULL;
+
+    float* dataArrayA = (float*)PyArray_DATA((PyArrayObject*)a);
+    // printf("%p\n",dataArrayA);
+    // printf("%d\n",i++);
+
+    npy_intp* shape = PyArray_DIMS((PyArrayObject*)a);
+    // printf("%d\n",i++);
+
+    int rows = shape[0];
+    int cols = shape[1];
+    // printf("rows=%d cols=%d sizeof(double)=%ld\n",rows, cols, sizeof(double));
+    int len = shape[0];
+    PyArray_Descr* dtype = PyArray_DESCR(a);
+    char typekind = dtype->kind;  // 'i' for signed integer, 'f' for float, etc.
+    int itemsize = dtype->elsize; // Size of each element in bytes
+    // printf("Data Type: %c, Item Size: %d\n", typekind, itemsize);
+
+    int data_type = (dtype->kind == 'f' ? T_FLOAT : T_COMPLEX);
+    // printf("%d\n",i++);
+
+    matrix_t * mat_a = bridge_manager.bridges[bridge_index].matrix_new(rows, cols, data_type, 0, dataArrayA);
+    // printf("%d\n",i++);
+
+    // printf("%p\n",vec_a->value.f);
+
+    PyObject* po = PyCapsule_New((void*)mat_a, "py_matrix_new", py_matrix_delete);
+
+    return po;
+}
+
+static PyObject* py_retrieve_numpy_matrix(PyObject* self, PyObject* args){
+    
+    PyObject* pf = NULL;
+
+    if(!PyArg_ParseTuple(args, "O:py_retrieve_numpy_matrix", &pf)) return NULL;
+
+    // printf("pf %p\n",pf);
+    matrix_t * mat = (matrix_t *)PyCapsule_GetPointer(pf, "py_matrix_new");
+    // printf("vec %p\n",vec);
+    // printf("%p\n",vec->value.f);
+    bridge_manager.bridges[bridge_index].matreqhost(mat);
+    mat->externalData = 1; //to make sure it will not be deallocated
+
+    // for (int i=0; i < vec->len; i++){
+    //     printf("%d %lf\n", i, vec->value.f[i]);
+    // }
+    int rows = mat->nrow;
+    int cols = mat->ncol;
+    npy_intp dims[2] = {rows, cols};  // Array dimensions
+    int data_type = (mat->type == T_FLOAT ? NPY_FLOAT64 : NPY_COMPLEX128);
+
+    PyObject* numpyArray = PyArray_SimpleNewFromData(2, dims, data_type, mat->value.f);
+
+    // double* outputData = (double*)PyArray_DATA((PyArrayObject*)numpyArray);
+
+    // for (int i=0; i < dims[0]; i++) {
+    //     printf("%d %f\n",i,outputData[i]);
+    // }
+
+    // Make sure to set flags to the NumPy array to manage memory correctly
+    PyArray_ENABLEFLAGS((PyArrayObject*)numpyArray, NPY_ARRAY_OWNDATA);
+    
+    return numpyArray;
+}
 
 static PyObject* py_matrix_new(PyObject* self, PyObject* args){
     int rows;
@@ -334,7 +486,7 @@ static PyObject* py_matrix_new(PyObject* self, PyObject* args){
     if (!PyArg_ParseTuple(args, "iii", &rows,&cols,&data_type)) return NULL;
     //printf("create %d\n",rows);
     //printf("create %d\n",cols);
-    matrix_t * a = bridge_manager.bridges[bridge_index].matrix_new(rows, cols, data_type, 1);
+    matrix_t * a = bridge_manager.bridges[bridge_index].matrix_new(rows, cols, data_type, 1, NULL);
     //printf("malloc %p\n",a);
     PyObject* po = PyCapsule_New((void*)a, "py_matrix_new", py_matrix_delete);
     //printf("capsule_new %p\n",po);
@@ -657,11 +809,15 @@ static PyMethodDef mainMethods[] = {
     {"init_engine", py_init_engine, METH_VARARGS, "init_engine"},
     {"stop_engine", py_stop_engine, METH_VARARGS, "stop_engine"},
     {"vector_new", py_vector_new, METH_VARARGS, "vector_new"},
+    {"load_numpy_array", py_load_numpy_array, METH_VARARGS, "load_numpy_array"},
+    {"retrieve_numpy_array", py_retrieve_numpy_array, METH_VARARGS, "retrieve_numpy_array"},
     {"vector_set", py_vector_set, METH_VARARGS, "vector_set"},
     {"vector_get", py_vector_get, METH_VARARGS, "vector_get"},
     {"move_vector_device", py_move_vector_device, METH_VARARGS, "move_vector_device"},
     {"move_vector_host", py_move_vector_host, METH_VARARGS, "move_vector_host"},
     {"matrix_new", py_matrix_new, METH_VARARGS, "matrix_new"},
+    {"load_numpy_matrix", py_load_numpy_matrix, METH_VARARGS, "load_numpy_matrix"},
+    {"retrieve_numpy_matrix", py_retrieve_numpy_matrix, METH_VARARGS, "retrieve_numpy_matrix"},
     {"matrix_set", py_matrix_set, METH_VARARGS, "matrix_set"},
     {"matrix_get", py_matrix_get, METH_VARARGS, "matrix_get"},
     {"move_matrix_device", py_move_matrix_device, METH_VARARGS, "move_matrix_device"},
@@ -710,6 +866,8 @@ PyMODINIT_FUNC PyInit_neblina(void) {
     PyModule_AddObject(module, "GPU", gpu_constant);
     PyModule_AddObject(module, "FLOAT", float_constant);
     PyModule_AddObject(module, "COMPLEX", complex_constant);
+
+    import_array();
     return module;
 }
 

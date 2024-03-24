@@ -29,8 +29,6 @@ RUN gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys A4B469963BF863CC &
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     cuda-12-0 \
-    libcudnn8 \
-    libcudnn8-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -51,16 +49,36 @@ COPY hiperblas-core/include /tmp/hiperblas-core/include
 COPY hiperblas-core/test /tmp/hiperblas-core/test
 COPY hiperblas-core/CMakeLists.txt /tmp/hiperblas-core/CMakeLists.txt
 
+RUN ln -s /usr/local/lib /usr/local/lib64
+
 RUN cd /tmp && \
     cd hiperblas-core && \
     cmake . && \
     make && \
     make install && \
-    ldconfig 
+    ldconfig \
+    && ./vector_test \
+    && ./matrix_test \
+    && ./sparse_matrix_test \
+    && ./neblina_test
 
-RUN ln -s /usr/local/lib /usr/local/lib64
+COPY hiperblas-opencl-bridge/src /tmp/hiperblas-opencl-bridge/src
+COPY hiperblas-opencl-bridge/include /tmp/hiperblas-opencl-bridge/include
+COPY hiperblas-opencl-bridge/test /tmp/hiperblas-opencl-bridge/test
+COPY hiperblas-opencl-bridge/CMakeLists.txt /tmp/hiperblas-opencl-bridge/CMakeLists.txt
+
+RUN cd /tmp && \
+    cd hiperblas-opencl-bridge && \
+    cmake . && \
+    make && \
+    make install && \
+    ldconfig
 
 RUN pip3 install pytest
+RUN pip3 install numpy
+RUN pip3 install scipy
+RUN pip3 install networkx
+RUN pip3 install matplotlib
 
 COPY pyhiperblas/setup.py /tmp/pyhiperblas/setup.py
 COPY pyhiperblas/test.py /tmp/pyhiperblas/test.py
@@ -69,11 +87,7 @@ COPY pyhiperblas/neblina_wrapper.c /tmp/pyhiperblas/neblina_wrapper.c
 RUN cd /tmp/pyhiperblas && \
     python3 setup.py install
  
-RUN pip3 install numpy
-RUN pip3 install scipy
-RUN pip3 install networkx
-RUN pip3 install matplotlib
-RUN pip3 install hiperwalk
+RUN pip install -i https://test.pypi.org/simple/ hiperwalk==2.0b3
 
 RUN fix-permissions "${CONDA_DIR}" && \
     fix-permissions "/home/${NB_USER}"
