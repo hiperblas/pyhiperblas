@@ -87,7 +87,7 @@ COPY pyhiperblas/neblina_wrapper.c /tmp/pyhiperblas/neblina_wrapper.c
 RUN cd /tmp/pyhiperblas && \
     python3 setup.py install
  
-RUN pip install -i https://test.pypi.org/simple/ hiperwalk==2.0b3
+RUN pip install -i https://test.pypi.org/simple/ hiperwalk==2.0b10
 
 RUN fix-permissions "${CONDA_DIR}" && \
     fix-permissions "/home/${NB_USER}"
