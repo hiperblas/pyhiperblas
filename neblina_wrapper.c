@@ -867,6 +867,7 @@ PyMODINIT_FUNC PyInit_neblina(void) {
     PyModule_AddObject(module, "FLOAT", float_constant);
     PyModule_AddObject(module, "COMPLEX", complex_constant);
 
+
     import_array();
     return module;
 }
