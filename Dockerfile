@@ -2,8 +2,8 @@
 FROM jupyter/minimal-notebook
 
 LABEL maintainer="prmottajr@gmail.com"
-LABEL version="1.1.1"
-LABEL description="This is custom Docker Image for the pyneblina library."
+LABEL version="2.0.b18-gpu"
+LABEL description="This is custom Docker Image for the Hiperwalk Quantum Walks Simulator."
 
 USER root
 
@@ -28,7 +28,10 @@ RUN gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys A4B469963BF863CC &
 # Update package lists and install CUDA Toolkit 12
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    cuda-12-0 \
+    cuda-libraries-12-0 \
+    cuda-toolkit-12-0 \
+    clinfo \
+    libnvidia-compute-550 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -75,10 +78,10 @@ RUN cd /tmp && \
     ldconfig
 
 RUN pip3 install pytest
-RUN pip3 install numpy
-RUN pip3 install scipy
-RUN pip3 install networkx
-RUN pip3 install matplotlib
+RUN pip3 install numpy==1.24.2
+RUN pip3 install scipy==1.11.1
+RUN pip3 install networkx==3.3
+RUN pip3 install matplotlib==3.8.4
 
 COPY pyhiperblas/setup.py /tmp/pyhiperblas/setup.py
 COPY pyhiperblas/test.py /tmp/pyhiperblas/test.py
@@ -87,7 +90,8 @@ COPY pyhiperblas/neblina_wrapper.c /tmp/pyhiperblas/neblina_wrapper.c
 RUN cd /tmp/pyhiperblas && \
     python3 setup.py install
  
-RUN pip install -i https://test.pypi.org/simple/ hiperwalk==2.0b10
+# RUN pip install -i https://test.pypi.org/simple/ hiperwalk==2.0b10
+RUN pip install hiperwalk==2.0b18
 
 RUN fix-permissions "${CONDA_DIR}" && \
     fix-permissions "/home/${NB_USER}"
