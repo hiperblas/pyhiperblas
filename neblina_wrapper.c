@@ -120,18 +120,22 @@ static PyObject* py_load_numpy_array(PyObject* self, PyObject* args){
 
     int rows = shape[0];
     int cols = shape[1];
-    printf("rows=%d cols=%d sizeof(double)=%ld\n",rows, cols, sizeof(double));
+    // printf("rows=%d cols=%d sizeof(double)=%ld\n",rows, cols, sizeof(double));
     int len = shape[0];
-    PyArray_Descr* dtype = PyArray_DESCR(a);
+    // PyArray_Descr* dtype = PyArray_DESCR(a);
+    PyArray_Descr* dtype = PyArray_DESCR((PyArrayObject*) a);
+    
     char typekind = dtype->kind;  // 'i' for signed integer, 'f' for float, etc.
-    int itemsize = dtype->elsize; // Size of each element in bytes
-    //printf("Data Type: %c, Item Size: %d\n", typekind, itemsize);
+    // int itemsize = dtype->elsize; // Size of each element in bytes
+    int itemsize = PyArray_ITEMSIZE((PyArrayObject*) a);
+
+    // printf("Data Type: %c, Item Size: %d\n", typekind, itemsize);
 
     int data_type = (dtype->kind == 'f' ? T_FLOAT : T_COMPLEX);
-    printf("%d\n",i++);
+    // printf("%d\n",i++);
 
     vector_t * vec_a = bridge_manager.bridges[bridge_index].vector_new(len, data_type, 0, dataArrayA);
-    printf("%d\n",i++);
+    // printf("%d\n",i++);
 
     // printf("%p\n",vec_a->value.f);
 
@@ -200,7 +204,7 @@ static PyObject* py_vector_get(PyObject* self, PyObject* args) {
     
     PyObject* pf = NULL;
     int n;
-    if(!PyArg_ParseTuple(args, "Oi:py_vector_set", &pf, &n)) return NULL;
+    if(!PyArg_ParseTuple(args, "Oi:py_vector_get", &pf, &n)) return NULL;
 
     // printf("print %d\n",n);
     // printf("pf %p\n",pf);
@@ -222,6 +226,21 @@ static PyObject* py_move_vector_device(PyObject* self, PyObject* args) {
     //printf("vec %p\n",vec);
     bridge_manager.bridges[bridge_index].vecreqdev(vec);
     Py_RETURN_NONE;
+}
+
+static PyObject* py_copy_vector_from_device(PyObject* self, PyObject* args) {
+    
+    PyObject* pf = NULL;
+    if(!PyArg_ParseTuple(args, "O:py_move_vector_device", &pf)) return NULL;
+
+    vector_t * vec_a = (vector_t *)PyCapsule_GetPointer(pf, "py_vector_new");
+    object_t ** in = convertToObject(vec_a, NULL);
+
+    vector_t * r = (vector_t *) copy_vector_from_device(&bridge_manager, bridge_index, (void **) in, NULL );
+
+    PyObject* po = PyCapsule_New((void*)r, "py_vector_new", py_vector_delete);
+    return po;
+
 }
 
 static PyObject* py_move_vector_host(PyObject* self, PyObject* args) {
@@ -426,9 +445,12 @@ static PyObject* py_load_numpy_matrix(PyObject* self, PyObject* args){
     int cols = shape[1];
     // printf("rows=%d cols=%d sizeof(double)=%ld\n",rows, cols, sizeof(double));
     int len = shape[0];
-    PyArray_Descr* dtype = PyArray_DESCR(a);
+    // PyArray_Descr* dtype = PyArray_DESCR(a);
+    PyArray_Descr* dtype = PyArray_DESCR((PyArrayObject*) a);
     char typekind = dtype->kind;  // 'i' for signed integer, 'f' for float, etc.
-    int itemsize = dtype->elsize; // Size of each element in bytes
+    // int itemsize = dtype->elsize; // Size of each element in bytes
+    int itemsize = PyArray_ITEMSIZE((PyArrayObject*) a);
+
     // printf("Data Type: %c, Item Size: %d\n", typekind, itemsize);
 
     int data_type = (dtype->kind == 'f' ? T_FLOAT : T_COMPLEX);
@@ -814,6 +836,7 @@ static PyMethodDef mainMethods[] = {
     {"vector_set", py_vector_set, METH_VARARGS, "vector_set"},
     {"vector_get", py_vector_get, METH_VARARGS, "vector_get"},
     {"move_vector_device", py_move_vector_device, METH_VARARGS, "move_vector_device"},
+    {"copy_vector_from_device", py_copy_vector_from_device, METH_VARARGS, "copy_vector_from_device"},
     {"move_vector_host", py_move_vector_host, METH_VARARGS, "move_vector_host"},
     {"matrix_new", py_matrix_new, METH_VARARGS, "matrix_new"},
     {"load_numpy_matrix", py_load_numpy_matrix, METH_VARARGS, "load_numpy_matrix"},
