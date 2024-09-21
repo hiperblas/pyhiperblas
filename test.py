@@ -141,6 +141,28 @@ def test_vector_matrix_multiplication():
     for i in range(n):
         print(vector_get(res, i))
 
+def test_vector_matrix_multiplication_reusing_results():
+    print("test_vector_matrix_multiplication_reusing_results")
+
+    n = 3000
+    vec_f = vector_new(n, FLOAT)
+    for i in range(n):
+        vector_set(vec_f, i, 1.0, 0.0)
+
+    mat_f = matrix_new(n, n, FLOAT)
+
+    for i in range(n):
+        for j in range(n):
+            matrix_set(mat_f, i, j, 2.0, 0.0)
+
+    res = matvec_mul(vec_f, mat_f)
+    for i in range(100):
+        res = matvec_mul(res, mat_f)
+
+    move_vector_host(res)
+
+    for i in range(n):
+        print(vector_get(res, i))
 
 
 def test_vector_matrix_multiplication_complex():
@@ -179,7 +201,31 @@ def test_vector_matrix_multiplication_complex():
     #for i in range(n):
         #print(str(i) + " " + str(vector_get(out, 2 * i)) + " " + str(vector_get(out, 2 * i + 1)) + "i")
 
+def test_vector_matrix_multiplication_complex_reusing_results():
+    print("test_vector_matrix_multiplication_complex_reusing_results")
 
+    n = 3000
+    vec_f = vector_new(n, COMPLEX)
+    for i in range(n):
+        vector_set(vec_f, i, 2.0, 2.0)
+
+    mat_f = matrix_new(n, n, COMPLEX)
+
+    for i in range(n):
+        for j in range(n):
+            matrix_set(mat_f, i, j, 3.0, 3.0)
+
+    move_vector_device(vec_f)
+    move_matrix_device(mat_f)
+
+    res = matvec_mul(vec_f, mat_f)
+    for i in range(100):
+        res = matvec_mul(res, mat_f)
+
+    move_vector_host(res)
+
+    for i in range(n):
+        print(vector_get(res, i))
 
 def test_vector_sparse_matrix_multiplication():
     print("test_vector_sparse_matrix_multiplication")
@@ -518,7 +564,9 @@ test_mat_add()
 test_scalar_mat_mul()
 test_scalar_vec_mul()
 test_vector_matrix_multiplication()
+test_vector_matrix_multiplication_reusing_results()
 test_vector_matrix_multiplication_complex()
+test_vector_matrix_multiplication_complex_reusing_results()
 test_vector_sparse_matrix_multiplication()
 test_vector_sparse_matrix_multiplication_complex()
 test_vec_conjugate()
